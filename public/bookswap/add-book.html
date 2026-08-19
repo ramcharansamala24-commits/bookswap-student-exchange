@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Book — BookSwap</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="navbar" id="navbar"></header>
+
+    <main class="section">
+      <div class="container">
+        <!-- Shown when the user is NOT logged in -->
+        <div id="loginNotice" class="hidden"></div>
+
+        <!-- Shown when the user IS logged in -->
+        <div id="addBookContent" class="hidden">
+          <div class="card form-card">
+            <h1 class="page-title" id="pageHeading">Add a Book</h1>
+            <p class="page-subtitle">Fill in the details of the book you want to sell, exchange or give away.</p>
+
+            <div id="formMessage" class="message hidden"></div>
+
+            <form id="bookForm" novalidate>
+              <div class="form-grid">
+                <div class="form-row">
+                  <label for="bookTitle">Book Title *</label>
+                  <input type="text" id="bookTitle" placeholder="Python Programming" />
+                </div>
+                <div class="form-row">
+                  <label for="bookAuthor">Author Name *</label>
+                  <input type="text" id="bookAuthor" placeholder="Reema Thareja" />
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-row">
+                  <label for="bookCategory">Subject / Category *</label>
+                  <select id="bookCategory">
+                    <option value="">Select category</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Mathematics">Mathematics</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="Civil">Civil</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label for="bookCondition">Book Condition *</label>
+                  <select id="bookCondition">
+                    <option value="">Select condition</option>
+                    <option value="New">New</option>
+                    <option value="Like New">Like New</option>
+                    <option value="Good">Good</option>
+                    <option value="Used">Used</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label for="bookDescription">Book Description *</label>
+                <textarea id="bookDescription" placeholder="Write a few lines about the book condition, chapters covered, etc."></textarea>
+              </div>
+
+              <div class="form-grid">
+                <div class="form-row">
+                  <label for="bookYearSem">Year / Semester *</label>
+                  <input type="text" id="bookYearSem" placeholder="1st Year / Semester 2" />
+                </div>
+                <div class="form-row">
+                  <label for="bookType">Exchange Option *</label>
+                  <select id="bookType">
+                    <option value="">Select option</option>
+                    <option value="Sell">Sell</option>
+                    <option value="Exchange">Exchange</option>
+                    <option value="Free">Free</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label for="bookPrice">Price (in ₹) — required only when selling</label>
+                <input type="number" id="bookPrice" min="0" placeholder="250" />
+              </div>
+
+              <div class="form-grid">
+                <div class="form-row">
+                  <label for="sellerName">Seller Name *</label>
+                  <input type="text" id="sellerName" />
+                </div>
+                <div class="form-row">
+                  <label for="sellerEmail">Seller Email *</label>
+                  <input type="email" id="sellerEmail" />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label for="bookImage">Book Image URL (optional)</label>
+                <input type="url" id="bookImage" placeholder="https://example.com/book.jpg" />
+              </div>
+
+              <div class="form-actions">
+                <button class="btn" type="submit" id="submitBtn">Add Book</button>
+                <button class="btn btn-outline" type="button" id="cancelBtn">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer"><p>BookSwap — Online Book Exchange Platform</p></footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/books.js"></script>
+  </body>
+</html>
