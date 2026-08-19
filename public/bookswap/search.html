@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Search Books — BookSwap</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="navbar" id="navbar"></header>
+
+    <main class="section">
+      <div class="container">
+        <h1 class="page-title">Search Books</h1>
+        <p class="page-subtitle">Search by title, author, category or subject and use the filters below.</p>
+
+        <div class="form-row">
+          <input type="text" id="searchInput" placeholder="Type a book title, author or subject..." />
+        </div>
+
+        <div class="filters">
+          <select id="categoryFilter">
+            <option value="">All Categories</option>
+            <option value="Computer Science">Computer Science</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Physics">Physics</option>
+            <option value="Chemistry">Chemistry</option>
+            <option value="Electronics">Electronics</option>
+            <option value="Mechanical">Mechanical</option>
+            <option value="Civil">Civil</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <select id="conditionFilter">
+            <option value="">All Conditions</option>
+            <option value="New">New</option>
+            <option value="Like New">Like New</option>
+            <option value="Good">Good</option>
+            <option value="Used">Used</option>
+          </select>
+
+          <select id="typeFilter">
+            <option value="">Sell / Exchange / Free</option>
+            <option value="Sell">Sell</option>
+            <option value="Exchange">Exchange</option>
+            <option value="Free">Free</option>
+          </select>
+
+          <select id="priceFilter">
+            <option value="">Any Price</option>
+            <option value="free">Free (₹ 0)</option>
+            <option value="low">Up to ₹ 200</option>
+            <option value="mid">₹ 201 - ₹ 400</option>
+            <option value="high">Above ₹ 400</option>
+          </select>
+
+          <button class="btn btn-outline" type="button" id="resetFilters">Reset</button>
+        </div>
+
+        <div id="resultCount" class="page-subtitle"></div>
+        <div class="book-grid" id="searchResults"></div>
+      </div>
+    </main>
+
+    <footer class="footer"><p>BookSwap — Online Book Exchange Platform</p></footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/books.js"></script>
+  </body>
+</html>
