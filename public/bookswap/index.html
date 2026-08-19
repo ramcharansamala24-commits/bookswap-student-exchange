@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BookSwap — Online Book Exchange Platform</title>
+    <meta name="description" content="BookSwap lets college students buy, sell and exchange their textbooks easily." />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- Navigation bar is created by main.js -->
+    <header class="navbar" id="navbar"></header>
+
+    <!-- Hero section -->
+    <section class="hero">
+      <div class="container">
+        <h1>Buy, Sell and Exchange Books with Students</h1>
+        <p>BookSwap helps college students share textbooks instead of buying new ones every semester.</p>
+        <form class="hero-search" id="heroSearchForm">
+          <input type="text" id="heroSearchInput" placeholder="Search by book title, author or subject..." />
+          <button class="btn" type="submit">Search</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Categories -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Browse by Category</h2>
+        <div class="category-grid">
+          <a class="category-card" href="search.html?category=Computer%20Science"><span class="cat-icon">💻</span>Computer Science</a>
+          <a class="category-card" href="search.html?category=Mathematics"><span class="cat-icon">📐</span>Mathematics</a>
+          <a class="category-card" href="search.html?category=Physics"><span class="cat-icon">🔬</span>Physics</a>
+          <a class="category-card" href="search.html?category=Chemistry"><span class="cat-icon">⚗️</span>Chemistry</a>
+          <a class="category-card" href="search.html?category=Electronics"><span class="cat-icon">🔌</span>Electronics</a>
+          <a class="category-card" href="search.html?category=Mechanical"><span class="cat-icon">⚙️</span>Mechanical</a>
+          <a class="category-card" href="search.html?category=Civil"><span class="cat-icon">🏗️</span>Civil</a>
+          <a class="category-card" href="search.html"><span class="cat-icon">📚</span>All Books</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recently added books -->
+    <section class="section">
+      <div class="container">
+        <h2 class="section-title">Recently Added Books</h2>
+        <div class="book-grid" id="recentBooks"></div>
+        <p class="hint"><a href="search.html">See all books &rarr;</a></p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>BookSwap — Online Book Exchange Platform · College mini-project built with HTML, CSS, JavaScript and LocalStorage.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/books.js"></script>
+  </body>
+</html>
