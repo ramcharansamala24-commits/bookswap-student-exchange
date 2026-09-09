@@ -1,6 +1,7 @@
 /* ===========================================================
    BookSwap - books.js
-   Everything about books:
+   Everything about books, now read from and written to the
+   online database:
    - Home page "Recently Added Books"
    - Search page (search + filters)
    - Book details page
@@ -8,31 +9,10 @@
    - My Books page (edit + delete)
    =========================================================== */
 
-/* ---------- 1. Find one book by its id ---------- */
-function findBookById(id) {
-  var books = getBooks();
-  for (var i = 0; i < books.length; i++) {
-    if (books[i].id === id) {
-      return books[i];
-    }
-  }
-  return null;
-}
-
-/* ---------- 2. HOME PAGE: recently added books ---------- */
-function setupHomePage() {
+/* ---------- 1. HOME PAGE: recently added books ---------- */
+async function setupHomePage() {
   var grid = document.getElementById("recentBooks");
   if (!grid) return;
-
-  var books = getBooks();
-  // The newest books are added at the end, so we show the list reversed.
-  var recent = books.slice().reverse().slice(0, 8);
-
-  var html = "";
-  for (var i = 0; i < recent.length; i++) {
-    html += bookCardHtml(recent[i], false);
-  }
-  grid.innerHTML = html;
 
   // Hero search box -> go to the search page with the typed text
   var heroForm = document.getElementById("heroSearchForm");
@@ -43,10 +23,26 @@ function setupHomePage() {
       window.location.href = "search.html?q=" + encodeURIComponent(text);
     });
   }
+
+  grid.innerHTML = loadingHtml("Loading books...");
+
+  var books = await getBooks(); // already newest first
+  var recent = books.slice(0, 8);
+
+  if (recent.length === 0) {
+    grid.innerHTML = loadingHtml("No books added yet. Be the first to add one!");
+    return;
+  }
+
+  var html = "";
+  for (var i = 0; i < recent.length; i++) {
+    html += bookCardHtml(recent[i], false);
+  }
+  grid.innerHTML = html;
 }
 
-/* ---------- 3. SEARCH PAGE ---------- */
-function setupSearchPage() {
+/* ---------- 2. SEARCH PAGE ---------- */
+async function setupSearchPage() {
   var grid = document.getElementById("searchResults");
   if (!grid) return;
 
@@ -67,9 +63,12 @@ function setupSearchPage() {
     categoryFilter.value = startCategory;
   }
 
-  // This function shows the books that match the search and the filters.
+  grid.innerHTML = loadingHtml("Loading books...");
+
+  // We download the books once, then filter them instantly while typing.
+  var allBooks = await getBooks();
+
   function showResults() {
-    var books = getBooks();
     var text = searchInput.value.trim().toLowerCase();
     var category = categoryFilter.value;
     var condition = conditionFilter.value;
@@ -77,8 +76,8 @@ function setupSearchPage() {
     var price = priceFilter.value;
 
     var results = [];
-    for (var i = 0; i < books.length; i++) {
-      var book = books[i];
+    for (var i = 0; i < allBooks.length; i++) {
+      var book = allBooks[i];
 
       // Search by title, author, category or description (subject)
       var haystack = (
@@ -151,13 +150,15 @@ function setupSearchPage() {
   showResults(); // show the books when the page opens
 }
 
-/* ---------- 4. BOOK DETAILS PAGE ---------- */
-function setupDetailsPage() {
+/* ---------- 3. BOOK DETAILS PAGE ---------- */
+async function setupDetailsPage() {
   var holder = document.getElementById("bookDetails");
   if (!holder) return;
 
+  holder.innerHTML = loadingHtml("Loading book details...");
+
   var id = getQueryParam("id");
-  var book = findBookById(id);
+  var book = await findBookById(id);
 
   if (!book) {
     holder.innerHTML =
@@ -180,7 +181,7 @@ function setupDetailsPage() {
     escapeHtml(book.title) +
     '"></div>' +
     "<div>" +
-    "<h1 class=\"page-title\">" +
+    '<h1 class="page-title">' +
     escapeHtml(book.title) +
     "</h1>" +
     '<p class="page-subtitle">by ' +
@@ -216,18 +217,18 @@ function setupDetailsPage() {
     "</div>";
 }
 
-/* ---------- 5. ADD BOOK / EDIT BOOK PAGE ---------- */
-function setupAddBookPage() {
+/* ---------- 4. ADD BOOK / EDIT BOOK PAGE ---------- */
+async function setupAddBookPage() {
   var form = document.getElementById("bookForm");
   if (!form) return;
 
   // Only logged-in users can add books
-  var user = requireLogin("addBookContent", "loginNotice", "Add Book");
+  var user = await requireLogin("addBookContent", "loginNotice", "Add Book");
   if (!user) return;
 
   // If the address contains ?edit=<id> we are editing an old book
   var editId = getQueryParam("edit");
-  var editingBook = editId ? findBookById(editId) : null;
+  var editingBook = editId ? await findBookById(editId) : null;
 
   // Fill the seller boxes with the logged-in user's details
   document.getElementById("sellerName").value = user.fullName;
@@ -235,7 +236,8 @@ function setupAddBookPage() {
 
   if (editingBook) {
     // Safety check: a user can edit only his/her own book
-    if (editingBook.ownerEmail !== user.email) {
+    // (the database rules also block anyone else)
+    if (editingBook.userId !== user.id) {
       showMessage("formMessage", "You can only edit the books that you added.", "error");
       form.classList.add("hidden");
       return;
@@ -263,7 +265,7 @@ function setupAddBookPage() {
     });
   }
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
     hideMessage("formMessage");
 
@@ -308,73 +310,58 @@ function setupAddBookPage() {
       price = Number(priceText);
     }
 
-    var books = getBooks();
+    var bookData = {
+      title: title,
+      author: author,
+      category: category,
+      description: description,
+      condition: condition,
+      yearSem: yearSem,
+      price: price,
+      type: type,
+      sellerName: sellerName,
+      sellerEmail: sellerEmail,
+      image: image,
+    };
+
+    showMessage("formMessage", "Saving to the database...", "info");
+
+    var result;
+    if (editingBook) {
+      result = await updateBook(editingBook.id, bookData);
+    } else {
+      result = await insertBook(bookData, user.id);
+    }
+
+    if (result.error) {
+      showMessage("formMessage", "Could not save the book: " + result.error.message, "error");
+      return;
+    }
 
     if (editingBook) {
-      // ---- EDIT: change the old book object ----
-      for (var i = 0; i < books.length; i++) {
-        if (books[i].id === editingBook.id) {
-          books[i].title = title;
-          books[i].author = author;
-          books[i].category = category;
-          books[i].description = description;
-          books[i].condition = condition;
-          books[i].yearSem = yearSem;
-          books[i].price = price;
-          books[i].type = type;
-          books[i].sellerName = sellerName;
-          books[i].sellerEmail = sellerEmail;
-          books[i].image = image;
-          break;
-        }
-      }
-      saveBooks(books);
       showMessage("formMessage", "Book updated successfully! Going to My Books...", "success");
     } else {
-      // ---- ADD: create a new book object ----
-      var newBook = {
-        id: createId(), // unique id
-        title: title,
-        author: author,
-        category: category,
-        description: description,
-        condition: condition,
-        yearSem: yearSem,
-        price: price,
-        type: type,
-        sellerName: sellerName,
-        sellerEmail: sellerEmail,
-        image: image,
-        ownerEmail: user.email, // the book belongs to the logged-in user
-      };
-      books.push(newBook);
-      saveBooks(books);
       showMessage("formMessage", "Book added successfully! Going to My Books...", "success");
       form.reset();
     }
 
     setTimeout(function () {
       window.location.href = "my-books.html";
-    }, 1300);
+    }, 1200);
   });
 }
 
-/* ---------- 6. MY BOOKS PAGE ---------- */
-function setupMyBooksPage() {
+/* ---------- 5. MY BOOKS PAGE ---------- */
+async function setupMyBooksPage() {
   var grid = document.getElementById("myBooks");
   if (!grid) return;
 
-  var user = requireLogin("myBooksContent", "loginNotice", "My Books");
+  var user = await requireLogin("myBooksContent", "loginNotice", "My Books");
   if (!user) return;
 
-  function showMyBooks() {
-    var books = getBooks();
-    var mine = [];
-    for (var i = 0; i < books.length; i++) {
-      if (books[i].ownerEmail === user.email) {
-        mine.push(books[i]);
-      }
-    }
+  async function showMyBooks() {
+    grid.innerHTML = loadingHtml("Loading your books...");
+    var mine = await getBooksByUser(user.id);
 
     if (mine.length === 0) {
       grid.innerHTML = "";
@@ -396,19 +383,16 @@ function setupMyBooksPage() {
     // Attach the delete action to every Delete button
     var deleteButtons = grid.querySelectorAll("[data-delete]");
     for (var k = 0; k < deleteButtons.length; k++) {
-      deleteButtons[k].addEventListener("click", function () {
+      deleteButtons[k].addEventListener("click", async function () {
         var id = this.getAttribute("data-delete");
         var sure = confirm("Are you sure you want to delete this book?");
         if (!sure) return;
 
-        var allBooks = getBooks();
-        var kept = [];
-        for (var m = 0; m < allBooks.length; m++) {
-          if (allBooks[m].id !== id) {
-            kept.push(allBooks[m]);
-          }
+        var result = await deleteBook(id);
+        if (result.error) {
+          alert("Could not delete the book: " + result.error.message);
+          return;
         }
-        saveBooks(kept);
         showMyBooks(); // refresh the list on the screen
       });
     }
@@ -417,7 +401,7 @@ function setupMyBooksPage() {
   showMyBooks();
 }
 
-/* ---------- 7. Start the correct page code ---------- */
+/* ---------- 6. Start the correct page code ---------- */
 document.addEventListener("DOMContentLoaded", function () {
   setupHomePage();
   setupSearchPage();

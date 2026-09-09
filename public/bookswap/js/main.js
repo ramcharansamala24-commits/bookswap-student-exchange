@@ -1,73 +1,132 @@
 /* ===========================================================
    BookSwap - main.js
    Common code used by every page:
-   - LocalStorage helper functions
-   - Sample books
+   - Database helper functions (books table)
+   - Current user / session helpers
    - Navigation bar
    - Small helper functions (book card, cover image, messages)
+
+   All book data now lives in the online database, not in the browser.
    =========================================================== */
 
-/* ---------- 1. LocalStorage key names ---------- */
-var USERS_KEY = "bookswap_users";
-var CURRENT_USER_KEY = "bookswap_currentUser";
-var BOOKS_KEY = "bookswap_books";
+/* ---------- 1. Current user (real login session) ---------- */
 
-/* ---------- 2. Read / write helpers ---------- */
+// The user who is logged in right now, or null when nobody is logged in.
+// Returns a simple object: { id, fullName, email }
+async function getCurrentUser() {
+  var result = await db.auth.getUser();
+  var user = result && result.data ? result.data.user : null;
+  if (!user) return null;
 
-// Read a value from localStorage and convert the JSON text into a JS value.
-function readStorage(key, fallbackValue) {
-  try {
-    var text = localStorage.getItem(key);
-    if (!text) {
-      return fallbackValue;
-    }
-    return JSON.parse(text);
-  } catch (error) {
-    // If the stored text is broken, just use the fallback value.
-    return fallbackValue;
+  var meta = user.user_metadata || {};
+  return {
+    id: user.id,
+    email: user.email || "",
+    fullName: meta.full_name || (user.email || "").split("@")[0],
+    college: meta.college || "",
+    department: meta.department || "",
+    year: meta.year || "",
+  };
+}
+
+async function logoutUser() {
+  await db.auth.signOut();
+}
+
+/* ---------- 2. Books in the database ---------- */
+
+// The database uses names like year_sem, the pages use yearSem.
+// These two small functions translate between the two styles.
+function rowToBook(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    author: row.author,
+    category: row.category,
+    description: row.description,
+    condition: row.condition,
+    yearSem: row.year_sem,
+    price: Number(row.price || 0),
+    type: row.type,
+    sellerName: row.seller_name,
+    sellerEmail: row.seller_email,
+    image: row.image || "",
+    createdAt: row.created_at,
+  };
+}
+
+function bookToRow(book) {
+  return {
+    title: book.title,
+    author: book.author,
+    category: book.category,
+    description: book.description,
+    condition: book.condition,
+    year_sem: book.yearSem,
+    price: book.price,
+    type: book.type,
+    seller_name: book.sellerName,
+    seller_email: book.sellerEmail,
+    image: book.image || "",
+  };
+}
+
+// Get every book (newest first).
+async function getBooks() {
+  var result = await db
+    .from("books")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (result.error) {
+    console.error("Could not load books:", result.error.message);
+    return [];
   }
+  return (result.data || []).map(rowToBook);
 }
 
-// Save a JS value into localStorage as JSON text.
-function writeStorage(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+// Get only the books added by one user.
+async function getBooksByUser(userId) {
+  var result = await db
+    .from("books")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (result.error) {
+    console.error("Could not load your books:", result.error.message);
+    return [];
+  }
+  return (result.data || []).map(rowToBook);
 }
 
-function getUsers() {
-  return readStorage(USERS_KEY, []);
+// Get one book using its id.
+async function findBookById(id) {
+  if (!id) return null;
+  var result = await db.from("books").select("*").eq("id", id).maybeSingle();
+  if (result.error || !result.data) return null;
+  return rowToBook(result.data);
 }
 
-function saveUsers(users) {
-  writeStorage(USERS_KEY, users);
+// Add a new book for the logged-in user.
+async function insertBook(book, userId) {
+  var row = bookToRow(book);
+  row.user_id = userId;
+  return await db.from("books").insert(row);
 }
 
-function getBooks() {
-  return readStorage(BOOKS_KEY, []);
+// Change an existing book (the database only allows the owner).
+async function updateBook(id, book) {
+  return await db.from("books").update(bookToRow(book)).eq("id", id);
 }
 
-function saveBooks(books) {
-  writeStorage(BOOKS_KEY, books);
-}
-
-// The user who is logged in right now (or null when nobody is logged in).
-function getCurrentUser() {
-  return readStorage(CURRENT_USER_KEY, null);
-}
-
-function setCurrentUser(user) {
-  writeStorage(CURRENT_USER_KEY, user);
-}
-
-function logoutUser() {
-  localStorage.removeItem(CURRENT_USER_KEY);
+// Delete a book (the database only allows the owner).
+async function deleteBook(id) {
+  return await db.from("books").delete().eq("id", id);
 }
 
 /* ---------- 3. Small helpers ---------- */
-
-// Create a unique id for a new book, e.g. "b_1723456789_452"
-function createId() {
-  return "b_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-}
 
 // Convert dangerous characters so text is always shown safely inside HTML.
 function escapeHtml(value) {
@@ -79,7 +138,7 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-// Read a value from the page address, e.g. book-details.html?id=b_123
+// Read a value from the page address, e.g. book-details.html?id=123
 function getQueryParam(name) {
   var params = new URLSearchParams(window.location.search);
   return params.get(name);
@@ -97,7 +156,6 @@ function formatPrice(book) {
 }
 
 // If a book has no image, we draw a simple colored cover with the title.
-// This avoids broken images on the page.
 function getCoverImage(book) {
   if (book.image && book.image.trim() !== "") {
     return book.image.trim();
@@ -136,157 +194,17 @@ function hideMessage(elementId) {
   box.textContent = "";
 }
 
-/* ---------- 4. Sample books ---------- */
-// These books are saved only the first time the site is opened,
-// so the website never looks empty.
-function getSampleBooks() {
-  return [
-    {
-      id: "sample_1",
-      title: "Python Programming",
-      author: "Reema Thareja",
-      category: "Computer Science",
-      description:
-        "Complete beginner friendly Python book with programs and exercises. Used for one semester only, no torn pages.",
-      condition: "Like New",
-      yearSem: "1st Year / Semester 2",
-      price: 260,
-      type: "Sell",
-      sellerName: "Ananya Rao",
-      sellerEmail: "ananya.rao@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_2",
-      title: "Data Structures and Algorithms",
-      author: "Narasimha Karumanchi",
-      category: "Computer Science",
-      description:
-        "Very useful for placement preparation and lab exams. Contains solved problems for every chapter.",
-      condition: "Good",
-      yearSem: "2nd Year / Semester 3",
-      price: 320,
-      type: "Sell",
-      sellerName: "Rahul Verma",
-      sellerEmail: "rahul.verma@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_3",
-      title: "Engineering Mathematics - I",
-      author: "B. S. Grewal",
-      category: "Mathematics",
-      description:
-        "Standard mathematics textbook covering calculus, matrices and differential equations. Willing to exchange for a Physics book.",
-      condition: "Good",
-      yearSem: "1st Year / Semester 1",
-      price: 0,
-      type: "Exchange",
-      sellerName: "Sneha Patil",
-      sellerEmail: "sneha.patil@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_4",
-      title: "Digital Electronics",
-      author: "R. P. Jain",
-      category: "Electronics",
-      description:
-        "Covers logic gates, flip flops, counters and registers. Some pages have pencil notes which are easy to erase.",
-      condition: "Used",
-      yearSem: "2nd Year / Semester 4",
-      price: 180,
-      type: "Sell",
-      sellerName: "Imran Shaikh",
-      sellerEmail: "imran.shaikh@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_5",
-      title: "Computer Fundamentals",
-      author: "P. K. Sinha",
-      category: "Computer Science",
-      description:
-        "Basic computer concepts book for first year students. Giving it away free to any junior who needs it.",
-      condition: "Good",
-      yearSem: "1st Year / Semester 1",
-      price: 0,
-      type: "Free",
-      sellerName: "Karthik Menon",
-      sellerEmail: "karthik.menon@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_6",
-      title: "Engineering Physics",
-      author: "H. K. Malik",
-      category: "Physics",
-      description:
-        "Theory plus numerical problems on optics, lasers and semiconductors. Cover is slightly bent but inside is clean.",
-      condition: "Good",
-      yearSem: "1st Year / Semester 2",
-      price: 210,
-      type: "Sell",
-      sellerName: "Divya Nair",
-      sellerEmail: "divya.nair@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_7",
-      title: "Engineering Chemistry",
-      author: "Jain and Jain",
-      category: "Chemistry",
-      description:
-        "First year chemistry textbook with water treatment, polymers and fuels chapters. Almost new condition.",
-      condition: "New",
-      yearSem: "1st Year / Semester 1",
-      price: 240,
-      type: "Sell",
-      sellerName: "Aditya Kulkarni",
-      sellerEmail: "aditya.kulkarni@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-    {
-      id: "sample_8",
-      title: "Java Programming",
-      author: "E. Balagurusamy",
-      category: "Computer Science",
-      description:
-        "Programming with Java, useful for OOP subject and lab record work. Free to exchange with a DBMS book.",
-      condition: "Like New",
-      yearSem: "2nd Year / Semester 3",
-      price: 0,
-      type: "Exchange",
-      sellerName: "Meera Joshi",
-      sellerEmail: "meera.joshi@example.com",
-      image: "",
-      ownerEmail: "sample@bookswap.local",
-    },
-  ];
+// Simple "Loading..." block used while the database answers.
+function loadingHtml(text) {
+  return '<div class="empty-state"><p>' + escapeHtml(text || "Loading...") + "</p></div>";
 }
 
-// If LocalStorage has no books at all, load the sample books.
-function loadSampleBooksIfEmpty() {
-  var books = getBooks();
-  if (!books || books.length === 0) {
-    saveBooks(getSampleBooks());
-  }
-}
-
-/* ---------- 5. Navigation bar ---------- */
-// The same navigation bar is used on all pages, so we build it with JavaScript.
-function buildNavbar() {
+/* ---------- 4. Navigation bar ---------- */
+async function buildNavbar() {
   var holder = document.getElementById("navbar");
   if (!holder) return;
 
-  var user = getCurrentUser();
+  var user = await getCurrentUser();
   var page = window.location.pathname.split("/").pop() || "index.html";
 
   function link(href, text) {
@@ -321,15 +239,15 @@ function buildNavbar() {
 
   var logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", function () {
-      logoutUser();
+    logoutBtn.addEventListener("click", async function () {
+      await logoutUser();
       alert("You have been logged out.");
       window.location.href = "index.html";
     });
   }
 }
 
-/* ---------- 6. Book card HTML ---------- */
+/* ---------- 5. Book card HTML ---------- */
 // showOwnerButtons = true on the My Books page (Edit / Delete buttons)
 function bookCardHtml(book, showOwnerButtons) {
   var ownerButtons = "";
@@ -380,8 +298,7 @@ function bookCardHtml(book, showOwnerButtons) {
   );
 }
 
-/* ---------- 7. Run on every page ---------- */
+/* ---------- 6. Run on every page ---------- */
 document.addEventListener("DOMContentLoaded", function () {
-  loadSampleBooksIfEmpty();
   buildNavbar();
 });

@@ -1,9 +1,11 @@
 /* ===========================================================
    BookSwap - auth.js
-   Registration, Login and Login-protection.
+   Real registration and login using the online database
+   (Lovable Cloud authentication).
 
-   NOTE: This is a simple beginner demo login using LocalStorage.
-   It is NOT real, secure, production-level authentication.
+   Passwords are never stored by our code. They are sent securely
+   to the authentication server, which stores them in an encrypted
+   (hashed) form.
    =========================================================== */
 
 /* ---------- 1. Small validation helpers ---------- */
@@ -19,11 +21,10 @@ function setupRegisterForm() {
   var form = document.getElementById("registerForm");
   if (!form) return;
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault(); // stop the page from reloading
     hideMessage("formMessage");
 
-    // Read the values typed by the user
     var fullName = document.getElementById("fullName").value.trim();
     var email = document.getElementById("email").value.trim().toLowerCase();
     var password = document.getElementById("password").value;
@@ -49,31 +50,35 @@ function setupRegisterForm() {
       return;
     }
 
-    // ---- Check if the email is already registered ----
-    var users = getUsers();
-    for (var i = 0; i < users.length; i++) {
-      if (users[i].email === email) {
-        showMessage("formMessage", "This email is already registered. Please login instead.", "error");
-        return;
-      }
-    }
+    showMessage("formMessage", "Creating your account, please wait...", "info");
 
-    // ---- Save the new user ----
-    var newUser = {
-      fullName: fullName,
+    // ---- Create the account in the database ----
+    var result = await db.auth.signUp({
       email: email,
       password: password,
-      college: college,
-      department: department,
-      year: year,
-    };
-    users.push(newUser);
-    saveUsers(users);
+      options: {
+        emailRedirectTo: window.location.origin + "/bookswap/login.html",
+        data: {
+          full_name: fullName,
+          college: college,
+          department: department,
+          year: year,
+        },
+      },
+    });
+
+    if (result.error) {
+      var text = result.error.message || "Registration failed. Please try again.";
+      if (text.toLowerCase().indexOf("already") !== -1) {
+        text = "This email is already registered. Please login instead.";
+      }
+      showMessage("formMessage", text, "error");
+      return;
+    }
 
     showMessage("formMessage", "Registration successful! Taking you to the login page...", "success");
     form.reset();
 
-    // Go to the login page after 1.5 seconds
     setTimeout(function () {
       window.location.href = "login.html";
     }, 1500);
@@ -85,7 +90,7 @@ function setupLoginForm() {
   var form = document.getElementById("loginForm");
   if (!form) return;
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
     hideMessage("formMessage");
 
@@ -101,45 +106,34 @@ function setupLoginForm() {
       return;
     }
 
-    // Look for a user with the same email and password
-    var users = getUsers();
-    var foundUser = null;
-    for (var i = 0; i < users.length; i++) {
-      if (users[i].email === email && users[i].password === password) {
-        foundUser = users[i];
-        break;
-      }
-    }
+    showMessage("formMessage", "Checking your details...", "info");
 
-    if (foundUser === null) {
+    var result = await db.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (result.error) {
       showMessage("formMessage", "Wrong email or password. Please try again or register first.", "error");
       return;
     }
 
-    // Save the logged-in user (we do not store the password here)
-    setCurrentUser({
-      fullName: foundUser.fullName,
-      email: foundUser.email,
-      college: foundUser.college,
-      department: foundUser.department,
-      year: foundUser.year,
-    });
-
-    showMessage("formMessage", "Login successful! Welcome back, " + foundUser.fullName + ".", "success");
+    var user = await getCurrentUser();
+    showMessage("formMessage", "Login successful! Welcome back, " + (user ? user.fullName : "") + ".", "success");
 
     // If the user was sent here from another page, go back to that page
     var nextPage = getQueryParam("next") || "index.html";
     setTimeout(function () {
       window.location.href = nextPage;
-    }, 1200);
+    }, 1000);
   });
 }
 
 /* ---------- 4. Login protection ---------- */
 // Used by Add Book and My Books pages.
 // If nobody is logged in, we hide the page content and show a message.
-function requireLogin(contentElementId, noticeElementId, pageName) {
-  var user = getCurrentUser();
+async function requireLogin(contentElementId, noticeElementId, pageName) {
+  var user = await getCurrentUser();
   var content = document.getElementById(contentElementId);
   var notice = document.getElementById(noticeElementId);
 
